@@ -25,7 +25,7 @@ Serial, UID/runtime directory and display above are **observed values for this F
 
 ## Click build and installation
 
-`packaging/click/` defines `utdotnet.inputdemo`, version `0.1.0`, architecture `arm64`, framework `ubuntu-touch-24.04-2.x`, policy version `2404.2`. The maintainer is Mi Lattanzio, as supplied for this build. The package is approximately 40.4 MiB and includes .NET; no system runtime installation is needed.
+`packaging/click/` defines `utdotnet.inputdemo`, version `0.1.1`, architecture `arm64`, framework `ubuntu-touch-24.04-2.x`, policy version `2404.2`. The maintainer is Mi Lattanzio, as supplied for this build. The package is approximately 40.4 MiB and includes .NET; no system runtime installation is needed.
 
 ```sh
 # Requires .NET SDK, Docker, Python 3 and desktop-file-validate.
@@ -33,16 +33,16 @@ Serial, UID/runtime directory and display above are **observed values for this F
 scripts/build-click.sh
 ```
 
-Output: `artifacts/click/utdotnet.inputdemo_0.1.0_arm64.click`. The script prints its SHA-256 and saves the review output to `artifacts/click/review.txt`. `CLICK_BUILD_IMAGE` selects a different compatible image. The tested image digest is `sha256:0a69f2c6c52a9d33516ce210eb5cb374ca93905985d62820d9be5a351647b5ba`.
+Output: `artifacts/click/utdotnet.inputdemo_0.1.1_arm64.click`. The script prints its SHA-256 and saves the review output to `artifacts/click/review.txt`. `CLICK_BUILD_IMAGE` selects a different compatible image. The tested image digest is `sha256:0a69f2c6c52a9d33516ce210eb5cb374ca93905985d62820d9be5a351647b5ba`.
 
 **Validator limitation:** the bundled `click-reviewers-tools 0.85~noble` recognizes the framework mapping but its static `APPARMOR_POLICIES` table lacks `2404.2`. It reports `security:policy_version_exists` and `security:policy_groups_exists`, returning 2 after the package has been built. This is retained as a failed review, not silently treated as a pass. The actual policy templates are installed in both container and device. The phone's Click service generated and enforced the profile successfully. `desktop-file-validate` also emits a nonfatal warning about the package-relative SVG icon; the Click hook resolves it to an absolute installed path. OpenStore review/publication has not been performed.
 
 Install and launch through Lomiri (substitute the observed serial and runtime directory for another device):
 
 ```sh
-adb -s 49f88e70 push artifacts/click/utdotnet.inputdemo_0.1.0_arm64.click /home/phablet/
-adb -s 49f88e70 shell 'gdbus call --system --dest com.lomiri.click --object-path /com/lomiri/click --method com.lomiri.click.Install /home/phablet/utdotnet.inputdemo_0.1.0_arm64.click'
-adb -s 49f88e70 shell 'XDG_RUNTIME_DIR=/run/user/32011 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/32011/bus lomiri-app-launch utdotnet.inputdemo_inputdemo_0.1.0'
+adb -s 49f88e70 push artifacts/click/utdotnet.inputdemo_0.1.1_arm64.click /home/phablet/
+adb -s 49f88e70 shell 'gdbus call --system --dest com.lomiri.click --object-path /com/lomiri/click --method com.lomiri.click.Install /home/phablet/utdotnet.inputdemo_0.1.1_arm64.click'
+adb -s 49f88e70 shell 'XDG_RUNTIME_DIR=/run/user/32011 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/32011/bus lomiri-app-launch utdotnet.inputdemo_inputdemo_0.1.1'
 ```
 
 The application also appears as **UTDotNet Input** in the launcher. The desktop entry follows the [UBports Click format](https://docs.ubports.com/en/latest/appdev/platform/click.html), with `X-Ubuntu-XMir-Enable=true` and no orientation restriction. DISPLAY, runtime directory, TMPDIR and grid scale come from Lomiri; no device UID or display number is embedded in the package.
@@ -53,6 +53,10 @@ The standard `ubuntu-sdk` AppArmor template is used with **no additional policy 
 - The launcher sets `RESOURCE_NAME` from `APP_ID`. [Avalonia 12.1.6's X11 window](https://github.com/AvaloniaUI/Avalonia/blob/12.1.6/src/Avalonia.X11/X11Window.cs) otherwise calls `Process.GetCurrentProcess().ProcessName`, whose procfs access fails under this profile. Supplying the supported identity avoids that access without changing framework code or permissions.
 
 The package enables the redacted `--trace` log in the app's systemd user unit and disables .NET diagnostic IPC. Typed text remains excluded. Optional DBus inventory still uses external `gdbus`, which is denied under confinement; the UI correctly reports Unknown. Maliit itself uses the managed connection and works independently. Future packaged inventory should use an in-process bus client. See [UBports writable directories](https://docs.ubports.com/en/latest/appdev/guides/writeable-dirs.html) and [policy groups](https://docs.ubports.com/en/latest/appdev/platform/apparmor.html).
+
+### Checks menu correction (0.1.1)
+
+The user reported that the Checks dropdowns did not open in 0.1.0; attempts coincided with repeated owner deactivation/reactivation. The demo now requests `X11PlatformOptions.OverlayPopups = true` only when Ubuntu Touch is detected. This [supported Avalonia option](https://github.com/AvaloniaUI/Avalonia/blob/12.1.6/src/Avalonia.X11/X11Platform.cs) hosts dropdowns in the application surface instead of separate native X11 popup windows. Desktop configuration is unchanged. ComboBox items have a minimum height of 48 logical units, and fixed test identifiers/result choices are logged on menu opening, closing and selection; notes are not logged.
 
 Use the currently serviced .NET 10 runtime for distribution. The tested host/runtime patch is recorded for reproducibility, not recommended as the latest available patch. [.NET Ubuntu dependencies and supported distributions](https://learn.microsoft.com/en-us/dotnet/core/install/linux-ubuntu-install) describe Ubuntu; Ubuntu Touch itself is not thereby a certified .NET platform.
 

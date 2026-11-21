@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -167,6 +168,46 @@ public class AvaloniaTests
                     $"Field {position}, {field.Bounds.Size}, keyboard top {keyboardTop}");
                 Assert.True(field.Bounds.Height >= 48);
                 Assert.Equal(16, field.FontSize);
+            }
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ChecksDropdownCanBeOpenedSelectedAndDismissedByTouch()
+    {
+        var window = new MainWindow(new SessionBusDiagnostics(new EmptyBus())) { Width = 360, Height = 640 };
+        window.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+            window.GetVisualDescendants().OfType<TabControl>().Single().SelectedIndex = 3;
+            Dispatcher.UIThread.RunJobs();
+            var combo = window.GetVisualDescendants().OfType<ComboBox>().First();
+            var popup = combo.GetVisualDescendants().OfType<Popup>().Single();
+            // Exercise the same embedded popup path selected by the Ubuntu Touch X11 backend.
+            popup.ShouldUseOverlayLayer = true;
+            Tap(combo);
+            Assert.True(combo.IsDropDownOpen);
+            var pass = window.GetVisualDescendants().OfType<ComboBoxItem>().Single(item => Equals(item.Content, "Pass"));
+            Assert.True(pass.Bounds.Height >= 48);
+            Tap(pass);
+            Assert.Equal("Pass", combo.SelectedItem);
+            Assert.False(combo.IsDropDownOpen);
+            Tap(combo);
+            Assert.True(combo.IsDropDownOpen);
+            var point = new Point(5, 5);
+            using var outside = window.TouchBegin(point);
+            window.TouchEnd(outside, point);
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(combo.IsDropDownOpen);
+            Assert.Equal("Pass", combo.SelectedItem);
+            void Tap(Control control)
+            {
+                var point = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value;
+                using var pointer = window.TouchBegin(point);
+                window.TouchEnd(pointer, point);
+                Dispatcher.UIThread.RunJobs();
             }
         }
         finally { window.Close(); }

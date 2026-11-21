@@ -47,6 +47,12 @@ internal static class Program
     public static AppBuilder BuildAvaloniaApp()
     {
         var builder = AppBuilder.Configure<App>().UsePlatformDetect();
+        if (new PlatformDetector().Detect().MobileEnvironment == LinuxMobileEnvironment.UbuntuTouch)
+        {
+            // Lomiri does not reliably focus independent X11 popup windows.
+            // Host dropdowns in the app surface so a touch does not deactivate their owner.
+            builder = builder.With(new X11PlatformOptions { OverlayPopups = true });
+        }
         if (Arguments.Contains("--wayland")) builder = builder.UseWayland();
         return builder;
     }

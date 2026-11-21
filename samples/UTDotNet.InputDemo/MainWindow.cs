@@ -8,6 +8,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using Avalonia.Styling;
 using Microsoft.Extensions.Logging;
 using UTDotNet.Avalonia;
 using UTDotNet.Core;
@@ -68,6 +69,10 @@ public sealed class MainWindow : Window
         }
         FontSize = 16;
         FontFamily = new FontFamily("DejaVu Sans");
+        Styles.Add(new Style(selector => selector.OfType<ComboBoxItem>())
+        {
+            Setters = { new Setter(MinHeightProperty, 48d) }
+        });
         _log.EntryAdded += OnEntryAdded;
         var inputs = new StackPanel { Spacing = 12, Margin = new Thickness(16) };
         inputs.Children.Add(Label("Tap a field. Typed text is not logged."));
@@ -210,6 +215,9 @@ public sealed class MainWindow : Window
         {
             panel.Children.Add(Label(test));
             var result = new ComboBox { ItemsSource = new[] { "Unverified", "Pass", "Fail" }, SelectedIndex = 0, MinHeight = 48, HorizontalAlignment = HorizontalAlignment.Stretch };
+            result.DropDownOpened += (_, _) => _log.Write("CheckMenu", $"{test}: opened");
+            result.DropDownClosed += (_, _) => _log.Write("CheckMenu", $"{test}: closed");
+            result.SelectionChanged += (_, _) => _log.Write("CheckResult", $"{test}: {result.SelectedItem}");
             var notes = new TextBox { PlaceholderText = "Observation / device details", MinHeight = 48 };
             if (_maliit is not null) _inputRegistrations.Add(_maliit.Register(notes, new()));
             panel.Children.Add(result); panel.Children.Add(notes);

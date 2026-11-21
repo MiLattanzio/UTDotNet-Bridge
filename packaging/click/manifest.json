@@ -1,7 +1,7 @@
 {
   "name": "utdotnet.inputdemo",
   "title": "UTDotNet Input",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Diagnostic application for native Ubuntu Touch input in .NET and Avalonia.",
   "maintainer": "Mi Lattanzio <mi@polecola.it>",
   "architecture": "arm64",
