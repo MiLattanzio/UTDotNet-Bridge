@@ -13,6 +13,7 @@ internal static class Program
     public static int Main(string[] args)
     {
         Arguments = args;
+        if (args.Contains("--trace")) global::Avalonia.Logging.Logger.Sink = new ClipboardTraceSink();
         ConfigurePhoneScale();
         if (args.Contains("--diagnostics"))
         {

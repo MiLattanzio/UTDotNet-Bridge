@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.TextInput;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using UTDotNet.Core;
@@ -54,6 +55,7 @@ public sealed class MaliitInputBridge : IPlatformInputService, IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         _fields.Add(field, new(field, request.Normalize()));
         field.GotFocus += OnGotFocus; field.LostFocus += OnLostFocus; field.Tapped += OnTapped;
+        field.AddHandler(InputElement.PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         field.DetachedFromVisualTree += OnDetached;
         return new RegistrationLifetime(this, field);
     }
@@ -66,6 +68,7 @@ public sealed class MaliitInputBridge : IPlatformInputService, IDisposable
         if (_active?.Registration.Field == field) EndLease();
         if (!_fields.Remove(field)) return;
         field.GotFocus -= OnGotFocus; field.LostFocus -= OnLostFocus; field.Tapped -= OnTapped;
+        field.RemoveHandler(InputElement.PointerPressedEvent, OnPointerPressed);
         field.DetachedFromVisualTree -= OnDetached;
     }
 
@@ -73,14 +76,21 @@ public sealed class MaliitInputBridge : IPlatformInputService, IDisposable
     { if (sender is TextBox field) await ActivateSafelyAsync(field); }
     private async void OnTapped(object? sender, TappedEventArgs e)
     { if (sender is TextBox field) await ActivateSafelyAsync(field); }
+    private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        // TextBox selects committed Text, not the separate preedit presentation. Finalize
+        // and reset before its pointer handler moves the caret or begins a hold selection.
+        if (_active is { } lease && lease.Registration.Field == sender && lease.Preedit.Length > 0)
+            OnResetRequested(lease.Client, EventArgs.Empty);
+    }
     private void OnLostFocus(object? sender, FocusChangedEventArgs e)
     {
         if (_active is not { } lease || lease.Registration.Field != sender) return;
-        // Let a focus transfer install its new registered field first. Otherwise this is a
-        // real blur (including a lock whose focus loss precedes Window.Deactivated) and must hide.
+        // Let a transfer install its new registered field, or a transient menu return
+        // focus to this field. A real blur (including a lock) must still hide.
         Dispatcher.UIThread.Post(() =>
         {
-            if (_active == lease) _ = DeactivateAsync();
+            if (_active == lease && !lease.Registration.Field.IsFocused) _ = DeactivateAsync();
         }, DispatcherPriority.Input);
     }
     private void OnDetached(object? sender, VisualTreeAttachmentEventArgs e)

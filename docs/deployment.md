@@ -25,7 +25,7 @@ Serial, UID/runtime directory and display above are **observed values for this F
 
 ## Click build and installation
 
-`packaging/click/` defines `utdotnet.inputdemo`, version `0.1.2`, architecture `arm64`, framework `ubuntu-touch-24.04-2.x`, policy version `2404.2`. The maintainer is Mi Lattanzio, as supplied for this build. The package is approximately 40.4 MiB and includes .NET; no system runtime installation is needed.
+`packaging/click/` defines `utdotnet.inputdemo`, version `0.1.5`, architecture `arm64`, framework `ubuntu-touch-24.04-2.x`, policy version `2404.2`. The maintainer is Mi Lattanzio, as supplied for this build. The package is approximately 40.4 MiB and includes .NET; no system runtime installation is needed.
 
 ```sh
 # Requires .NET SDK, Docker, Python 3 and desktop-file-validate.
@@ -33,16 +33,16 @@ Serial, UID/runtime directory and display above are **observed values for this F
 scripts/build-click.sh
 ```
 
-Output: `artifacts/click/utdotnet.inputdemo_0.1.2_arm64.click`. The script prints its SHA-256 and saves the review output to `artifacts/click/review.txt`. `CLICK_BUILD_IMAGE` selects a different compatible image. The tested image digest is `sha256:0a69f2c6c52a9d33516ce210eb5cb374ca93905985d62820d9be5a351647b5ba`.
+Output: `artifacts/click/utdotnet.inputdemo_0.1.5_arm64.click`. The script prints its SHA-256 and saves the review output to `artifacts/click/review.txt`. `CLICK_BUILD_IMAGE` selects a different compatible image. The tested image digest is `sha256:0a69f2c6c52a9d33516ce210eb5cb374ca93905985d62820d9be5a351647b5ba`.
 
 **Validator limitation:** the bundled `click-reviewers-tools 0.85~noble` recognizes the framework mapping but its static `APPARMOR_POLICIES` table lacks `2404.2`. It reports `security:policy_version_exists` and `security:policy_groups_exists`, returning 2 after the package has been built. This is retained as a failed review, not silently treated as a pass. The actual policy templates are installed in both container and device. The phone's Click service generated and enforced the profile successfully. `desktop-file-validate` also emits a nonfatal warning about the package-relative SVG icon; the Click hook resolves it to an absolute installed path. OpenStore review/publication has not been performed.
 
 Install and launch through Lomiri (substitute the observed serial and runtime directory for another device):
 
 ```sh
-adb -s 49f88e70 push artifacts/click/utdotnet.inputdemo_0.1.2_arm64.click /home/phablet/
-adb -s 49f88e70 shell 'gdbus call --system --dest com.lomiri.click --object-path /com/lomiri/click --method com.lomiri.click.Install /home/phablet/utdotnet.inputdemo_0.1.2_arm64.click'
-adb -s 49f88e70 shell 'XDG_RUNTIME_DIR=/run/user/32011 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/32011/bus lomiri-app-launch utdotnet.inputdemo_inputdemo_0.1.2'
+adb -s 49f88e70 push artifacts/click/utdotnet.inputdemo_0.1.5_arm64.click /home/phablet/
+adb -s 49f88e70 shell 'gdbus call --system --dest com.lomiri.click --object-path /com/lomiri/click --method com.lomiri.click.Install /home/phablet/utdotnet.inputdemo_0.1.5_arm64.click'
+adb -s 49f88e70 shell 'XDG_RUNTIME_DIR=/run/user/32011 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/32011/bus lomiri-app-launch utdotnet.inputdemo_inputdemo_0.1.5'
 ```
 
 The application also appears as **UTDotNet Input** in the launcher. The desktop entry follows the [UBports Click format](https://docs.ubports.com/en/latest/appdev/platform/click.html), with `X-Ubuntu-XMir-Enable=true` and no orientation restriction. DISPLAY, runtime directory, TMPDIR and grid scale come from Lomiri; no device UID or display number is embedded in the package.
@@ -61,6 +61,10 @@ The user reported that the Checks dropdowns did not open in 0.1.0; attempts coin
 ### Lock-screen keyboard correction (0.1.2)
 
 The bridge now requests native hide before releasing the input peer when the window deactivates, preserving pending composition and preventing a late hide from affecting a new context. Focus transfers between registered fields and owned dialogs retain their handoff behavior. This requires no new AppArmor rules or lock-screen service access. The user verified dismissal on physical screen lock, preserved text and reopening on the FP5; 53 automated tests pass. The profile was observed as `utdotnet.inputdemo_inputdemo_0.1.2 (enforce)`.
+
+### Text clipboard follow-up (0.1.5)
+
+The current build includes opt-in bounded clipboard writes with exact ownership verification, guards against delayed deletion after an editor changes, and the original phone text menus with 64×48-unit minimum items. It also preserves the Maliit context when a closing menu returns focus immediately. Pending preedit is finalized before touch selection. The full suite passes 70 tests. Native Qt clipboard interoperability remains unresolved; see the [device record](device-testing.md#cut-follow-up) for physical results and the [input guide](input-method.md#bounded-clipboard-writes-source-changes-after-012-preview1) for API scope. These source changes are not in the published NuGet 0.1.2-preview.1 packages. The Click still uses the standard AppArmor profile and has the same two review-tool policy-metadata errors described above.
 
 Use the currently serviced .NET 10 runtime for distribution. The tested host/runtime patch is recorded for reproducibility, not recommended as the latest available patch. [.NET Ubuntu dependencies and supported distributions](https://learn.microsoft.com/en-us/dotnet/core/install/linux-ubuntu-install) describe Ubuntu; Ubuntu Touch itself is not thereby a certified .NET platform.
 

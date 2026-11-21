@@ -166,6 +166,10 @@ See [deployment and confinement](docs/deployment.md), [device record and test ma
 
 Build the installable ARM64 Click with `scripts/build-click.sh`; see the deployment document for prerequisites, installation commands and the bundled review tool's policy-metadata limitation. The tested package uses the standard AppArmor template with no extra policy groups. Rotation, a real kernel suspend/resume cycle, retained composition and input after resume have been verified on this FP5.
 
-Remaining validation includes clipboard interoperability, touch selection handles, multiple keyboard languages, long sessions and OpenStore review. Packaged DBus inventory reports Unknown because external `gdbus` is denied; native Maliit uses an independent managed connection. Per-span preedit styling and hardware-key redirection are not implemented. This is a developer integration tested on one device, not a production support claim for all Ubuntu Touch images.
+Click 0.1.5 passed the user's physical word-selection and Cut/Paste test, including selection of text still in composition. It keeps the original text menus with phone-sized targets. The source adds bounded clipboard writes with exact ownership verification and guards against delayed deletion; these changes are not yet included in the published NuGet 0.1.2-preview.1 packages. Earlier device checks also passed replacement with native keyboard input and copy/paste between fields. See the [test record](docs/device-testing.md#cut-follow-up).
+
+Clipboard exchange with the native Lomiri UI Toolkit Gallery failed in both directions in 0.1.2 and remains unresolved. Handle dragging extended the selection, but its context menu did not reliably return afterward; recovery after dragging was not rechecked in 0.1.5.
+
+Remaining validation includes multiline selection handles, multiple keyboard languages, long sessions and OpenStore review. Packaged DBus inventory reports Unknown because external `gdbus` is denied; native Maliit uses an independent managed connection. Per-span preedit styling and hardware-key redirection are not implemented. This is a developer integration tested on one device, not a production support claim for all Ubuntu Touch images.
 
 MIT license; see [LICENSE](LICENSE).

@@ -73,6 +73,7 @@ public sealed class MainWindow : Window
         {
             Setters = { new Setter(MinHeightProperty, 48d) }
         });
+        ConfigurePhoneTextEditing(_report);
         _log.EntryAdded += OnEntryAdded;
         var inputs = new StackPanel { Spacing = 12, Margin = new Thickness(16) };
         inputs.Children.Add(Label("Tap a field. Typed text is not logged."));
@@ -150,6 +151,10 @@ public sealed class MainWindow : Window
             AcceptsReturn = request.Multiline, TextWrapping = request.Multiline ? TextWrapping.Wrap : TextWrapping.NoWrap,
             PasswordChar = request.InputType == InputType.Password ? '●' : '\0' };
         var adapter = new TextInputAdapter(field, name, request, _log);
+        field.CuttingToClipboard += (_, _) => _log.Write("ClipboardAction", $"{name}: Cut requested; content redacted");
+        field.CopyingToClipboard += (_, _) => _log.Write("ClipboardAction", $"{name}: Copy requested; content redacted");
+        field.PastingFromClipboard += (_, _) => _log.Write("ClipboardAction", $"{name}: Paste requested; content redacted");
+        ConfigurePhoneTextEditing(field, owned is not null);
         (owned ?? _adapters).Add(adapter);
         if (_maliit is not null)
         {
@@ -160,6 +165,17 @@ public sealed class MainWindow : Window
         field.GotFocus += (_, _) => { _lastField = field; _lastAdapter = adapter; };
         panel.Children.Add(field);
         return field;
+    }
+
+    private void ConfigurePhoneTextEditing(TextBox field, bool disposeOnDetach = false)
+    {
+        if (_platform.MobileEnvironment != LinuxMobileEnvironment.UbuntuTouch) return;
+        var menu = new PhoneTextMenu(field);
+        _inputRegistrations.Add(menu);
+        var clipboard = new TextClipboardBridge(field, _log);
+        _inputRegistrations.Add(clipboard);
+        if (disposeOnDetach) field.DetachedFromVisualTree += (_, _) =>
+        { clipboard.Dispose(); menu.Dispose(); _inputRegistrations.Remove(clipboard); _inputRegistrations.Remove(menu); };
     }
 
     private async Task RequestKeyboardAsync()
@@ -219,6 +235,7 @@ public sealed class MainWindow : Window
             result.DropDownClosed += (_, _) => _log.Write("CheckMenu", $"{test}: closed");
             result.SelectionChanged += (_, _) => _log.Write("CheckResult", $"{test}: {result.SelectedItem}");
             var notes = new TextBox { PlaceholderText = "Observation / device details", MinHeight = 48 };
+            ConfigurePhoneTextEditing(notes);
             if (_maliit is not null) _inputRegistrations.Add(_maliit.Register(notes, new()));
             panel.Children.Add(result); panel.Children.Add(notes);
             _checks.Add((test, result, notes));
@@ -304,7 +321,11 @@ public sealed class MainWindow : Window
         foreach (var check in _checks) report.AppendLine($"{check.Test}: {check.Result.SelectedItem}; {check.Notes.Text}");
         report.AppendLine("\nRecent events:");
         foreach (var entry in _log.Snapshot()) report.AppendLine(entry.ToString());
-        await clipboard.SetTextAsync(report.ToString());
+        if (_platform.MobileEnvironment == LinuxMobileEnvironment.UbuntuTouch)
+        {
+            if (!await ClipboardTextWriter.TryWriteAsync(clipboard, report.ToString(), _log, _lifetime.Token)) return;
+        }
+        else await clipboard.SetTextAsync(report.ToString());
         _log.Write("Clipboard", "Diagnostic report copied");
     }
     private void OnEntryAdded(DiagnosticEvent entry)

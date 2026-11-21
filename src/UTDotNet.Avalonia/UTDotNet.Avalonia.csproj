@@ -3,6 +3,7 @@
     <Description>Experimental Avalonia 12 integration for the Ubuntu Touch native Maliit keyboard, including text editing, focus lifecycle and keyboard inset helpers.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="UTDotNet.Tests" />
     <ProjectReference Include="../UTDotNet.Diagnostics/UTDotNet.Diagnostics.csproj" />
     <ProjectReference Include="../UTDotNet.UbuntuTouch/UTDotNet.UbuntuTouch.csproj" />
     <PackageReference Include="Avalonia" />
