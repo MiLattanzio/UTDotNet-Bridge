@@ -38,6 +38,8 @@ public sealed class MaliitInputBridge : IPlatformInputService, IDisposable
     private readonly HashSet<Window> _windows = [];
     private InputArea _lastArea;
     private Lease? _active;
+    private Task _pendingDismissal = Task.CompletedTask;
+    private int _activationEpoch;
     private bool _disposed;
     public event Action<Window, InputArea>? InputAreaChanged;
     public bool IsAvailable => _active?.Session.IsConnected == true;
@@ -72,11 +74,23 @@ public sealed class MaliitInputBridge : IPlatformInputService, IDisposable
     private async void OnTapped(object? sender, TappedEventArgs e)
     { if (sender is TextBox field) await ActivateSafelyAsync(field); }
     private void OnLostFocus(object? sender, FocusChangedEventArgs e)
-    { if (_active?.Registration.Field == sender) EndLease(); }
+    {
+        if (_active is not { } lease || lease.Registration.Field != sender) return;
+        // Let a focus transfer install its new registered field first. Otherwise this is a
+        // real blur (including a lock whose focus loss precedes Window.Deactivated) and must hide.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_active == lease) _ = DeactivateAsync();
+        }, DispatcherPriority.Input);
+    }
     private void OnDetached(object? sender, VisualTreeAttachmentEventArgs e)
     { if (_active?.Registration.Field == sender) EndLease(); }
     private void OnDeactivated(object? sender, EventArgs e)
-    { if (_active is { } lease && TopLevel.GetTopLevel(lease.Registration.Field) == sender) EndLease(); }
+    {
+        if (_active is not { } lease || TopLevel.GetTopLevel(lease.Registration.Field) != sender) return;
+        // If focus already moved, the queued blur handler allows an owned dialog to take over.
+        if (lease.Registration.Field.IsFocused) _ = DeactivateAsync();
+    }
     private void OnWindowClosed(object? sender, EventArgs e)
     {
         if (sender is not Window window) return;
@@ -98,6 +112,10 @@ public sealed class MaliitInputBridge : IPlatformInputService, IDisposable
 
     private async Task ActivateAsync(TextBox field)
     {
+        var epoch = _activationEpoch;
+        // An old hide must finish before a new context can show a keyboard.
+        await _pendingDismissal;
+        if (epoch != _activationEpoch) return;
         if (_disposed || !field.IsFocused || field.IsReadOnly || !_fields.TryGetValue(field, out var registration)) return;
         if (_active?.Registration.Field == field)
         { _ = await ShowKeyboardAsync(registration.Request); return; }
@@ -255,12 +273,23 @@ public sealed class MaliitInputBridge : IPlatformInputService, IDisposable
         InputAreaChanged?.Invoke(window, area);
     }
 
-    private void EndLease()
+    /// <summary>
+    /// On the UI thread, preserve composition and hide native input before releasing its connection.
+    /// A later field tap/focus can reopen it. Window deactivation calls this automatically.
+    /// </summary>
+    public Task DeactivateAsync()
+    {
+        _activationEpoch++;
+        _lastArea = default;
+        EndLease(dismissKeyboard: true);
+        return _pendingDismissal;
+    }
+
+    private void EndLease(bool dismissKeyboard = false)
     {
         if (_active is not { } lease) return;
         _active = null;
         CommitPending(lease);
-        lease.Closed.Cancel(); lease.Session.Dispose();
         lease.Client.SurroundingTextChanged -= OnStateChanged;
         lease.Client.SelectionChanged -= OnStateChanged;
         lease.Client.CursorRectangleChanged -= OnStateChanged;
@@ -268,6 +297,30 @@ public sealed class MaliitInputBridge : IPlatformInputService, IDisposable
         lease.Client.SetPreeditText(null, null);
         InputMethod.SetIsInputMethodEnabled(lease.Registration.Field, lease.OriginalIme);
         if (TopLevel.GetTopLevel(lease.Registration.Field) is Window window) InputAreaChanged?.Invoke(window, default);
+        if (dismissKeyboard) _pendingDismissal = DismissAndDisposeAsync(lease);
+        else { lease.Closed.Cancel(); lease.Session.Dispose(); }
+    }
+
+    private async Task DismissAndDisposeAsync(Lease lease)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        try
+        {
+            // Opening may already have queued showInputMethod. Finish it before the terminal hide.
+            // Detached callbacks cannot edit the field while the old connection is draining.
+            await lease.Ready.WaitAsync(timeout.Token);
+            if (lease.Session.IsConnected)
+            {
+                _log.Write("MaliitLifecycle", "Window inactive; requesting native keyboard dismissal.");
+                await lease.Session.HideAsync(timeout.Token);
+                _log.Write("MaliitLifecycle", "Hide acknowledged before releasing input context; visibility=Unknown.");
+            }
+        }
+        catch (Exception error)
+        {
+            _log.Write("MaliitLifecycle", $"Dismissal failed or timed out: {error.GetType().Name}; releasing context.", LogLevel.Warning);
+        }
+        finally { lease.Closed.Cancel(); lease.Session.Dispose(); }
     }
 
     private static void CommitPending(Lease lease, bool preserveSelection = false)

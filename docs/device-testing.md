@@ -13,7 +13,7 @@ Device interaction below used injected touchscreen events through the already-ac
 | Check | Result | Scope |
 |---|---|---|
 | Release build / ARM64 publish | Pass | SDK 10.0.401; untrimmed self-contained directory, about 108 MiB |
-| Automated suite | Pass, 51 tests | Platform detection, fallbacks, diagnostics/process cancellation, headless editing/undo, sensitive state, stale callbacks, composition finalization, area handoff, bounded peer initialization, focused-field visibility across rotation, and touch opening/selection/outside dismissal of Checks dropdowns |
+| Automated suite | Pass, 53 tests | Platform detection, fallbacks, diagnostics/process cancellation, headless editing/undo, sensitive state, stale callbacks, composition finalization, area handoff, bounded peer initialization, focused-field visibility across rotation, Checks dropdown touch interaction, and hide-before-disconnect ordering/failure recovery on deactivation |
 | Final desktop X11 smoke | Pass | Window, focus/text diagnostics, fallback OSK results and app render; no native desktop IME claim |
 | Earlier explicit desktop Wayland smoke | Pass | Phase 1 real-window smoke; not repeated for native Maliit |
 | Phone layout | Pass | Headless 360×640 and 900×384 with keyboard, 16-unit font and at least 48-unit fields; physical checks below |
@@ -46,6 +46,7 @@ Test results are retained under ignored `artifacts/test-results/`. The input ser
 | Composition and editing after resume | Pass in Click: `ciao` was still preedit before sleep, finalized and preserved after resume/context loss; retap reconnected; backspace, replacement character and space commit worked |
 | Click confinement | Pass for installation, launch, scale, X11/Maliit input and lifecycle above; `/proc/10449/attr/current` returned `utdotnet.inputdemo_inputdemo_0.1.0 (enforce)`, no extra policy groups |
 | Checks dropdowns (0.1.1) | Pass: user physically opened the first menu, selected Pass, reopened and selected Fail, and confirmed it works. Logs show matching open/result/close events without the earlier focus cycling; PID 11496 ran under `utdotnet.inputdemo_inputdemo_0.1.1 (enforce)` |
+| Keyboard on lock screen (0.1.2) | Pass: user physically locked/woke/unlocked the FP5 and confirmed the app keyboard no longer covered the lock screen, `ciao` was preserved and a later field tap reopened input. Logs show deactivation at 01:32:55.994 UTC, composition finalized, hide requested at 01:32:56.014 and acknowledged at 01:32:56.017 before peer disposal; activation resumed at 01:33:02.105. Standard AppArmor remains enforced |
 | Click review / OpenStore | Review tool blocked by missing static 2404.2 policy metadata (two errors); no other errors or warnings, some checks not applicable. Not published or OpenStore-approved |
 | Long sessions | Unverified |
 | Native Wayland on FP5 | Blocked before window creation: xdg_wm_base v1 versus required >=3; no text-input manager in observed registry |
@@ -62,6 +63,7 @@ The bridge is experimental. Graphics startup still emits gralloc/Zink/GLX warnin
 - A 200-unit minimum content height left the landscape field underneath the OSK. The inset now reserves the entire intersection; the demo hides nonessential surrounding controls when height is limited, keeping text and touch targets at their original size.
 - Confined startup denied external launcher utilities and Avalonia's procfs-derived process name. Shell builtins and the supported `RESOURCE_NAME` identity fixed startup without broader permissions.
 - Checks dropdowns failed to open on the phone with independent X11 popup windows. Version 0.1.1 uses Avalonia's embedded popup option on Ubuntu Touch and 48-unit minimum menu items. The user verified Pass/Fail selection on the installed package; desktop backend configuration is unchanged.
+- Closing the Maliit peer on window deactivation did not itself hide the native keyboard. Version 0.1.2 explicitly sends hide before disposing the peer, preserves preedit, and serializes a later reopening behind that hide. It uses existing window/focus events with no additional AppArmor rules. Clearing a zero keyboard area during window teardown no longer queries detached screen coordinates.
 
 ## Evidence and remaining work
 
@@ -70,5 +72,7 @@ The bridge is experimental. Graphics startup still emits gralloc/Zink/GLX warnin
 `artifacts/verification/lifecycle/` adds landscape before/after screenshots, preedit before suspension, portrait after resume, reopened keyboard and redacted Click logs. The original orientation preferences were restored (`orientation-lock=none`, `rotation-lock=true`); power timeouts and brightness were not changed.
 
 `artifacts/verification/checks/click-0.1.1-menu.log` records the user's successful physical dropdown interaction. The compositor capture service returned `Failed to obtain buffer stream from screencast` during this follow-up, so this result relies on the user's confirmation and event logs, not a new screenshot. The automated test separately verifies touch opening, selection, minimum item height, reopening and outside dismissal.
+
+`artifacts/verification/lock/` contains the 0.1.2 pre-lock composition capture and redacted lifecycle log. The user confirmed the physical lock-screen behavior and reopening after unlock. This follow-up corrected a gap in the earlier suspend/resume test: retained text after resume did not establish keyboard dismissal while the lock screen was visible. The bridge still reports keyboard visibility Unknown; the hide acknowledgement is not used as a visibility measurement.
 
 Next device checks: touch selection and replacement, native clipboard, accented composition, search/phone/URL modes and longer background sessions. Packaged DBus inventory needs an in-process implementation because launching `gdbus` is denied. Resolve the Click review tool's policy table before claiming a complete store review. Keep the developer path and baseline switch for comparisons.

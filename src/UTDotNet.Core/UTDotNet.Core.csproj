@@ -1,1 +1,5 @@
-<Project Sdk="Microsoft.NET.Sdk" />
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Conservative Ubuntu Touch platform detection, phone display scaling and shared input contracts for .NET applications.</Description>
+  </PropertyGroup>
+</Project>

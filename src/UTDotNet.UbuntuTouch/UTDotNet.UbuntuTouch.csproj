@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Experimental managed Maliit input transport for Ubuntu Touch, with bidirectional DBus callbacks and focus session ownership. No Qt dependency.</Description>
+  </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="UTDotNet.Tests" />
     <ProjectReference Include="../UTDotNet.Diagnostics/UTDotNet.Diagnostics.csproj" />

@@ -1,0 +1,27 @@
+<Project>
+  <Import Project="../Directory.Build.props" />
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Authors>Mi Lattanzio</Authors>
+    <Copyright>Copyright (c) 2026 Mi</Copyright>
+    <PackageProjectUrl>https://github.com/MiLattanzio/UTDotNet-Bridge</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/MiLattanzio/UTDotNet-Bridge</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>UbuntuTouch;Lomiri;Maliit;Avalonia;Linux;input-method</PackageTags>
+    <PackageReleaseNotes>First experimental NuGet release. Includes native Maliit input, phone layout helpers and keyboard dismissal on window deactivation. Validated on Fairphone 5 with Ubuntu Touch 24.04-2.2 through X11/XWayland; see the package README for limitations.</PackageReleaseNotes>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Keep existing API summaries; undocumented members do not block preview packaging. -->
+    <NoWarn>$(NoWarn);1591</NoWarn>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)../packaging/nuget/README.md" Pack="true" PackagePath="/README.md" />
+    <None Include="$(MSBuildThisFileDirectory)../LICENSE" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>

@@ -40,14 +40,14 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )",
-          "UTDotNet.Core": "[1.0.0, )"
+          "UTDotNet.Core": "[0.1.2-preview.1, )"
         }
       },
       "utdotnet.ubuntutouch": {
         "type": "Project",
         "dependencies": {
           "Tmds.DBus.Protocol": "[0.94.1, )",
-          "UTDotNet.Diagnostics": "[1.0.0, )"
+          "UTDotNet.Diagnostics": "[0.1.2-preview.1, )"
         }
       },
       "Microsoft.Extensions.Logging.Abstractions": {
@@ -65,7 +65,6 @@
         "resolved": "0.94.1",
         "contentHash": "11YMr7FnAbL83bQmVxlhbIKHvSLxjO81D12Ej0QMSGXMDTxNA9MTOa4MQxx43nv5el/efuPHwzyrj6a5ha2gug=="
       }
-    },
-    "net10.0/linux-arm64": {}
+    }
   }
 }

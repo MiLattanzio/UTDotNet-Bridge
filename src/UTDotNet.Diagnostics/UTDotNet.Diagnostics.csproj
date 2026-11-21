@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Bounded diagnostic logging, environment reports and optional DBus service inspection for UTDotNet applications.</Description>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../UTDotNet.Core/UTDotNet.Core.csproj" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />

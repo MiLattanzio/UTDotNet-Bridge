@@ -16,6 +16,8 @@ Widget keys and editing semantics were checked against [MInputContext](https://g
 - Commits use TextInput and normal deletion/selection, preserving undo. Preedit uses the public text client. Commits never append directly to TextBox.Text.
 - A focus change invalidates the old connection. Pending composition is finalized in its original field. Explicit hide finalizes preedit, resets the server and updates state before hiding.
 - Failed connections restore the framework IME. A later tap creates a new peer; no infinite reconnect loop runs. Dialog fields unregister on detachment.
+- Window deactivation now finalizes pending composition, sends `hideInputMethod`, waits for its acknowledgement and then releases the peer. Disconnecting alone did not hide the keyboard on the FP5 lock screen. `DeactivateAsync()` exposes the same UI-thread operation to hosts. Reopening waits for any outstanding dismissal so an old hide cannot close a newly opened context; shutdown uses a one-second cancellation budget and logs failures without claiming visibility.
+- Focus loss is resolved after the current focus transfer. Switching directly to another registered field retains the existing handoff behavior; leaving text input hides the keyboard. Detached callbacks cannot edit the old field while its terminal hide is in progress.
 - Passwords omit surrounding text/offsets, disable prediction/capitalization and log no text or lengths. Ordinary text content is also redacted. Live protocol memory necessarily contains the text being edited.
 - Area events guide layout. Acknowledgements return RequestedUnconfirmed and visibility stays Unknown. Device test results establish actual keyboard appearance separately with compositor captures.
 

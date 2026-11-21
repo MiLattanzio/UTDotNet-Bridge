@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Experimental Avalonia 12 integration for the Ubuntu Touch native Maliit keyboard, including text editing, focus lifecycle and keyboard inset helpers.</Description>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../UTDotNet.Diagnostics/UTDotNet.Diagnostics.csproj" />
     <ProjectReference Include="../UTDotNet.UbuntuTouch/UTDotNet.UbuntuTouch.csproj" />

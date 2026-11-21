@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Input.TextInput;
@@ -171,16 +172,93 @@ public class MaliitTests
         finally { dialog.Close(); parent.Close(); }
     }
 
+    [AvaloniaFact]
+    public async Task DeactivationPreservesCompositionAndFinishesHideBeforeRetapReopens()
+    {
+        var field = new TextBox();
+        var window = new Window { Width = 360, Height = 640, Content = field };
+        var hideCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sessions = new List<FakeSession>();
+        using var bridge = new MaliitInputBridge(new(), () =>
+        {
+            var session = new FakeSession { HideCompletion = sessions.Count == 0 ? hideCompletion.Task : Task.CompletedTask };
+            sessions.Add(session); return session;
+        });
+        using var registration = bridge.Register(field, new());
+        InputArea lastArea = default;
+        bridge.InputAreaChanged += (_, area) => lastArea = area;
+        window.Show();
+        try
+        {
+            field.Focus(); Dispatcher.UIThread.RunJobs();
+            var old = sessions.Single();
+            var callback = old.DispatchAsync!;
+            await callback(new PreeditText("ciao", 0, 0, -1, 0));
+            await callback(new InputAreaChanged(new(0, 400, 360, 240)));
+            var dismissal = bridge.DeactivateAsync();
+            Assert.Same(dismissal, bridge.DeactivateAsync());
+            Assert.Equal("ciao", field.Text);
+            Assert.Equal(default, lastArea);
+            Assert.Equal(1, old.HideRequests);
+            Assert.False(old.Disposed);
+            Assert.False(bridge.IsAvailable);
+            Assert.True(InputMethod.GetIsInputMethodEnabled(field));
+            await callback(new CommitText("stale", 0, 0, -1));
+            Assert.Equal("ciao", field.Text);
+            // The still-focused field must reopen on a later tap, after the old hide has completed.
+            var point = new Point(30, 30);
+            using var touch = window.TouchBegin(point);
+            window.TouchEnd(touch, point); Dispatcher.UIThread.RunJobs();
+            Assert.Single(sessions);
+            hideCompletion.SetResult();
+            await dismissal;
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(old.Disposed);
+            Assert.Equal(2, sessions.Count);
+            Assert.True(bridge.IsAvailable);
+            Assert.Equal(0, sessions.Last().HideRequests);
+            await sessions.Last().DispatchAsync!(new CommitText("!", 0, 0, -1));
+            Assert.Contains("!", field.Text);
+            Assert.Equal("ciao", field.Text!.Replace("!", ""));
+        }
+        finally { hideCompletion.TrySetResult(); window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task WindowDeactivationReleasesFailedHideWithoutLosingText()
+    {
+        var field = new TextBox(); var window = new Window { Content = field }; var other = new Window();
+        var session = new FakeSession { HideCompletion = Task.FromException(new IOException("disconnected")) };
+        var log = new DiagnosticLog();
+        using var bridge = new MaliitInputBridge(log, () => session);
+        using var registration = bridge.Register(field, new());
+        window.Show();
+        try
+        {
+            field.Focus(); Dispatcher.UIThread.RunJobs();
+            await session.DispatchAsync!(new PreeditText("preserved", 0, 0, -1, 0));
+            other.Show(); other.Activate(); Dispatcher.UIThread.RunJobs();
+            Assert.Equal(1, session.HideRequests);
+            await bridge.DeactivateAsync();
+            Assert.Equal(1, session.HideRequests);
+            Assert.True(session.Disposed);
+            Assert.Equal("preserved", field.Text);
+            Assert.Contains(log.Snapshot(), entry => entry.Category == "MaliitLifecycle" && entry.Message.Contains("IOException"));
+        }
+        finally { other.Close(); window.Close(); }
+    }
+
     internal sealed class FakeSession : IMaliitSession
     {
         public Func<MaliitEvent, Task<MaliitWidgetState?>>? DispatchAsync { get; set; }
         public bool IsConnected { get; private set; }
         public bool Disposed { get; private set; }
         public int HideRequests { get; private set; }
+        public Task HideCompletion { get; init; } = Task.CompletedTask;
         public Task OpenAsync(MaliitWidgetState state, CancellationToken cancellationToken) { IsConnected = true; return Task.CompletedTask; }
         public Task UpdateAsync(MaliitWidgetState state, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task ShowAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task HideAsync(CancellationToken cancellationToken) { HideRequests++; return Task.CompletedTask; }
+        public Task HideAsync(CancellationToken cancellationToken) { HideRequests++; return HideCompletion.WaitAsync(cancellationToken); }
         public Task ResetAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public void Dispose() { Disposed = true; IsConnected = false; }
     }

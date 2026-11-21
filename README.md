@@ -41,7 +41,13 @@ No text content is logged by the input observer. Password diagnostics also omit 
 
 ## Use the adapter in another application
 
-Reference `src/UTDotNet.Avalonia/UTDotNet.Avalonia.csproj` during development:
+Install the preview package (which brings in the other three libraries):
+
+```sh
+dotnet add package UTDotNet.Avalonia --version 0.1.2-preview.1
+```
+
+Alternatively, reference `src/UTDotNet.Avalonia/UTDotNet.Avalonia.csproj` during development. See [NuGet release packaging](docs/nuget-release.md) for building packages locally and publishing with GitHub OIDC.
 
 ```csharp
 var log = new DiagnosticLog();

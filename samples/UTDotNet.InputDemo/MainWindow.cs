@@ -270,9 +270,15 @@ public sealed class MainWindow : Window
     private void ApplyInputArea(Window window, InputArea area)
     {
         if (window.Content is not Control content) return;
-        var origin = window.PointToScreen(default);
-        var viewport = new PixelRect(origin, PixelSize.FromSize(window.ClientSize, window.RenderScaling));
-        var inset = MaliitLayout.BottomInset(area, viewport, window.RenderScaling);
+        var inset = 0d;
+        // A zero area also arrives while the window's presentation source is being detached.
+        // Clearing the inset needs no native screen coordinates in that case.
+        if (area.Width > 0 && area.Height > 0)
+        {
+            var origin = window.PointToScreen(default);
+            var viewport = new PixelRect(origin, PixelSize.FromSize(window.ClientSize, window.RenderScaling));
+            inset = MaliitLayout.BottomInset(area, viewport, window.RenderScaling);
+        }
         if (window == this)
         {
             _inputArea = area;
