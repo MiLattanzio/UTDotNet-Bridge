@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="UTDotNet.Tests" />
+    <ProjectReference Include="../UTDotNet.Diagnostics/UTDotNet.Diagnostics.csproj" />
+    <PackageReference Include="Tmds.DBus.Protocol" />
+  </ItemGroup>
+</Project>

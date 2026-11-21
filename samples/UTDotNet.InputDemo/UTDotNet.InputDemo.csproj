@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/UTDotNet.Avalonia/UTDotNet.Avalonia.csproj" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Wayland" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+  </ItemGroup>
+</Project>

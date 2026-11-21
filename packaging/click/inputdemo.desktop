@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=UTDotNet Input
+Comment=Ubuntu Touch input diagnostics
+Exec=./launch.sh
+Icon=icon.svg
+Terminal=false
+Type=Application
+X-Ubuntu-Touch=true
+X-Ubuntu-XMir-Enable=true

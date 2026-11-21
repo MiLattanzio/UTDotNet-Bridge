@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../UTDotNet.Diagnostics/UTDotNet.Diagnostics.csproj" />
+    <ProjectReference Include="../UTDotNet.UbuntuTouch/UTDotNet.UbuntuTouch.csproj" />
+    <PackageReference Include="Avalonia" />
+  </ItemGroup>
+</Project>
