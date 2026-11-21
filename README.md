@@ -4,6 +4,119 @@ A reusable .NET/Avalonia integration library for Ubuntu Touch, with an **experim
 
 Native keyboard opening, composition/commit, backspace, password, numeric/email modes, multiline editing and hide/reopen have been exercised on a Fairphone 5 running Ubuntu Touch 24.04-2.2 through X11/XWayland. A Click build also runs with the standard AppArmor profile and native Maliit input. Tests use injected touchscreen events, physical orientation changes and system-compositor captures. Native Wayland remains blocked; see the [validation record](docs/device-testing.md) for precise scope.
 
+## Install from NuGet
+
+The published preview is **0.1.2-preview.1**, targeting **.NET 10** and tested with **Avalonia 12.1.6**. Run this in your Avalonia application's project directory:
+
+```sh
+dotnet add package UTDotNet.Avalonia --version 0.1.2-preview.1
+```
+
+Or add the reference to the application's `.csproj`:
+
+```xml
+<ItemGroup>
+  <PackageReference Include="UTDotNet.Avalonia" Version="0.1.2-preview.1" />
+</ItemGroup>
+```
+
+`UTDotNet.Avalonia` brings in the other three libraries as dependencies. For applications that only need a lower layer, install the corresponding package from this table using the same version:
+
+| Package | Use it for |
+| --- | --- |
+| [UTDotNet.Core](https://www.nuget.org/packages/UTDotNet.Core/0.1.2-preview.1) | Platform detection, phone display scaling and shared input contracts. |
+| [UTDotNet.Diagnostics](https://www.nuget.org/packages/UTDotNet.Diagnostics/0.1.2-preview.1) | Bounded logging, environment reports and optional DBus inspection. |
+| [UTDotNet.UbuntuTouch](https://www.nuget.org/packages/UTDotNet.UbuntuTouch/0.1.2-preview.1) | Managed Maliit sessions and callbacks for a custom UI integration. |
+| [UTDotNet.Avalonia](https://www.nuget.org/packages/UTDotNet.Avalonia/0.1.2-preview.1) | Native keyboard integration for Avalonia `TextBox` controls. |
+
+Keep the application's Avalonia backend and theme packages, such as `Avalonia.Desktop` and `Avalonia.Themes.Fluent`, aligned with the tested Avalonia version. The application supplies its display backend, theme, native Linux dependencies and deployment configuration. These NuGet packages contain libraries; the installable Ubuntu Touch demo is a separate [Click package](docs/deployment.md).
+
+## Use the packages in an Avalonia application
+
+This minimal code-only window can be assigned to `desktop.MainWindow` by your existing Avalonia `App`. Keep the application's normal theme setup. `TextInputAdapter` applies input hints and observes diagnostics; `MaliitInputBridge` enables native Maliit input only after Ubuntu Touch is detected.
+
+```csharp
+using System;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using UTDotNet.Core;
+using UTDotNet.Diagnostics;
+using UTDotNet.Avalonia;
+
+public sealed class InputWindow : Window
+{
+    private readonly TextInputAdapter _adapter;
+    private readonly MaliitInputBridge? _bridge;
+    private readonly IDisposable? _registration;
+
+    public InputWindow()
+    {
+        Title = "UTDotNet input";
+        Width = 400;
+        Height = 720;
+        FontSize = 16;
+
+        var email = new TextBox
+        {
+            PlaceholderText = "Email address",
+            MinHeight = 48,
+            VerticalAlignment = VerticalAlignment.Top
+        };
+        Content = new ScrollViewer { Content = email, Margin = new Thickness(16) };
+
+        var log = new DiagnosticLog();
+        var request = new InputRequest { InputType = InputType.Email };
+        _adapter = new TextInputAdapter(email, "email", request, log);
+
+        if (new PlatformDetector().Detect().MobileEnvironment == LinuxMobileEnvironment.UbuntuTouch)
+        {
+            _bridge = new MaliitInputBridge(log);
+            _registration = _bridge.Register(email, request);
+        }
+
+        Closed += (_, _) =>
+        {
+            _registration?.Dispose();
+            _bridge?.Dispose();
+            _adapter.Dispose();
+        };
+    }
+}
+```
+
+Construct, register and dispose these objects on Avalonia's UI thread. Keep each registration for the field's lifetime. For multiple fields or owned dialogs, share one bridge across the window group and dispose it when the owning group closes. Diagnostic identifiers such as `"email"` should be fixed names. The input observer does not log typed text.
+
+Set the field's `InputRequest.InputType` to `Text`, `Password`, `Email`, `Numeric`, `Phone`, `Url` or `Search`. For passwords, also set the `TextBox.PasswordChar`; for multiline editing, set both `TextBox.AcceptsReturn` and `InputRequest.Multiline`. The application supplies validation. Register field-specific requests; changing an active native registration's input type is not supported in this preview.
+
+The bridge temporarily disables the framework IME on its active registered field and restores it afterwards. Window deactivation requests keyboard dismissal and preserves composition; a later field tap can reopen the keyboard. An application with its own background transition can also `await bridge.DeactivateAsync()` on the UI thread while retaining its registrations.
+
+### Phone layout and startup
+
+In your existing `Program.BuildAvaloniaApp`, enable embedded X11 popups on Ubuntu Touch so dropdown menus remain usable under Lomiri. This uses the application's `Avalonia.Desktop` package and existing `App` class:
+
+```csharp
+using Avalonia;
+using UTDotNet.Core;
+
+public static class Program
+{
+    public static AppBuilder BuildAvaloniaApp()
+    {
+        var builder = AppBuilder.Configure<App>().UsePlatformDetect();
+        if (new PlatformDetector().Detect().MobileEnvironment == LinuxMobileEnvironment.UbuntuTouch)
+            builder = builder.With(new X11PlatformOptions { OverlayPopups = true });
+        return builder;
+    }
+}
+```
+
+Apply phone scaling **before Avalonia initializes**. `PhoneDisplayScale.FromGridUnit` converts Lomiri's `GRID_UNIT_PX` into an absolute Avalonia scale (grid / 8). The [demo startup](samples/UTDotNet.InputDemo/Program.cs) sets `AVALONIA_SCREEN_SCALE_FACTORS` and respects existing scale overrides; it also handles development shells that do not inherit the grid value. The library leaves application-wide scaling to the host.
+
+Keep text around 16 logical units and touch targets at least 48 units high, including dropdown items. For forms with fields near the bottom, handle `InputAreaChanged`, calculate the overlap with `MaliitLayout.BottomInset`, reserve that space and bring the focused field into view. Recalculate when the window size changes. The [demo window](samples/UTDotNet.InputDemo/MainWindow.cs) includes keyboard insets, dialogs and rotation handling; the minimal window above only places a field at the top.
+
+`IPlatformInputService.IsAvailable` describes a connected native input session; it can be false before a field gains focus. It does not describe ordinary desktop text input. Show/hide acknowledgements return `RequestedUnconfirmed`, with `KeyboardVisibility.Unknown`; they do not prove the keyboard is visible. See [input integration](docs/input-method.md) for protocol behavior and limitations.
+
 ## Build and run
 
 Requires .NET 10 SDK. Avalonia is pinned to 12.1.6; `global.json` accepts installed .NET 10 feature bands. The development host used SDK 10.0.401 and runtime 10.0.12.
@@ -39,37 +152,7 @@ dotnet run --project samples/UTDotNet.InputDemo -c Release --no-build -- --smoke
 
 No text content is logged by the input observer. Password diagnostics also omit lengths, selection offsets and editing key names. Diagnostic notes are user-authored and included verbatim in copied reports.
 
-## Use the adapter in another application
-
-Install the preview package (which brings in the other three libraries):
-
-```sh
-dotnet add package UTDotNet.Avalonia --version 0.1.2-preview.1
-```
-
-Alternatively, reference `src/UTDotNet.Avalonia/UTDotNet.Avalonia.csproj` during development. See [NuGet release packaging](docs/nuget-release.md) for building packages locally and publishing with GitHub OIDC.
-
-```csharp
-var log = new DiagnosticLog();
-var adapter = new TextInputAdapter(textBox, "email",
-    new InputRequest { InputType = InputType.Email }, log);
-// On Ubuntu Touch only, opt the field into native input:
-MaliitInputBridge? bridge = null;
-IDisposable? registration = null;
-if (new PlatformDetector().Detect().MobileEnvironment == LinuxMobileEnvironment.UbuntuTouch)
-{
-    bridge = new MaliitInputBridge(log);
-    registration = bridge.Register(textBox, adapter.Request);
-}
-// Keep these objects for the view lifetime; dispose on the UI thread:
-registration?.Dispose();
-bridge?.Dispose();
-adapter.Dispose();
-```
-
-Namespaces: `UTDotNet.Core`, `UTDotNet.Diagnostics`, `UTDotNet.Avalonia`. Calls belong on Avalonia's UI thread. Identifiers should be fixed field names, not user-entered text. The application remains responsible for `PasswordChar`, `AcceptsReturn`, validation and layout; the adapter supplies hints and observes events. Use one bridge per application/window group and retain each registration. The bridge temporarily disables the framework IME only on its active registered field and restores it afterwards. Use `MaliitLayout.BottomInset` with `InputAreaChanged` for keyboard overlap; the demo shows how. Applications own display scaling and validation.
-
-`IPlatformInputService.IsAvailable` refers to direct keyboard control, not the availability of ordinary text input. The desktop fallback returns `Unsupported`. The native bridge returns `RequestedUnconfirmed` for show/hide acknowledgements; visibility remains `Unknown`. Register field-specific hints: active type mutation is unsupported, and show requests with different hints are explicitly rejected.
+For development against the source, reference `src/UTDotNet.Avalonia/UTDotNet.Avalonia.csproj` in place of the NuGet reference. See [NuGet release packaging](docs/nuget-release.md) for local package verification and publishing with GitHub OIDC.
 
 ## Device deployment and remaining work
 
