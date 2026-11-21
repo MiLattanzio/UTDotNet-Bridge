@@ -198,8 +198,8 @@
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.6, )",
-          "UTDotNet.Diagnostics": "[0.1.2-preview.1, )",
-          "UTDotNet.UbuntuTouch": "[0.1.2-preview.1, )"
+          "UTDotNet.Diagnostics": "[0.1.5-preview.1, )",
+          "UTDotNet.UbuntuTouch": "[0.1.5-preview.1, )"
         }
       },
       "utdotnet.core": {
@@ -209,14 +209,14 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )",
-          "UTDotNet.Core": "[0.1.2-preview.1, )"
+          "UTDotNet.Core": "[0.1.5-preview.1, )"
         }
       },
       "utdotnet.ubuntutouch": {
         "type": "Project",
         "dependencies": {
           "Tmds.DBus.Protocol": "[0.94.1, )",
-          "UTDotNet.Diagnostics": "[0.1.2-preview.1, )"
+          "UTDotNet.Diagnostics": "[0.1.5-preview.1, )"
         }
       },
       "Avalonia": {

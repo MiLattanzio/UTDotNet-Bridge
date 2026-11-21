@@ -12,6 +12,7 @@ import zipfile
 root = Path(__file__).resolve().parent.parent
 feed = Path(sys.argv[1]).resolve()
 version = ET.parse(root / 'Directory.Build.props').findtext('.//Version')
+commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
 names = ['UTDotNet.' + part for part in ('Core', 'Diagnostics', 'UbuntuTouch', 'Avalonia')]
 expected = {f'{name}.{version}.{suffix}' for name in names for suffix in ('nupkg', 'snupkg')}
 actual = {p.name for p in feed.glob('*.nupkg')} | {p.name for p in feed.glob('*.snupkg')}
@@ -32,6 +33,7 @@ for name in names:
         repository = metadata.find('n:repository', ns)
         assert repository.get('url') == 'https://github.com/MiLattanzio/UTDotNet-Bridge'
         assert re.fullmatch('[0-9a-f]{40}', repository.get('commit', ''))
+        assert repository.get('commit') == commit, (name, repository.get('commit'), commit)
         assert {'README.md', 'LICENSE', f'lib/net10.0/{name}.dll', f'lib/net10.0/{name}.xml'} <= files
         libraries = [f for f in files if f.endswith('.dll')]
         assert libraries == [f'lib/net10.0/{name}.dll'], libraries
@@ -63,6 +65,10 @@ with tempfile.TemporaryDirectory(prefix='utdotnet-consumer-') as directory:
     ET.ElementTree(configuration).write(consumer / 'NuGet.Config', encoding='utf-8')
     (consumer / 'Program.cs').write_text('''using System;
 using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input.Platform;
+using System.Threading;
+using System.Threading.Tasks;
 using UTDotNet.Core;
 using UTDotNet.Diagnostics;
 using UTDotNet.UbuntuTouch;
@@ -72,9 +78,14 @@ var log = new DiagnosticLog();
 log.Write("Consumer", platform.MobileEnvironment.ToString());
 using var session = new MaliitSession();
 using var bridge = new MaliitInputBridge(log);
+// Compile the new public API without constructing a view outside an Avalonia UI thread.
+Func<TextBox, DiagnosticLog, TextClipboardBridge> attachClipboard = (field, diagnostics) => new(field, diagnostics);
+Func<IClipboard, string, DiagnosticLog, CancellationToken, Task<bool>> writeClipboard = ClipboardTextWriter.TryWriteAsync;
+GC.KeepAlive(attachClipboard);
+GC.KeepAlive(writeClipboard);
 var inset = MaliitLayout.BottomInset(new InputArea(0, 600, 400, 200), new PixelRect(0, 0, 400, 800), 2);
 if (log.Snapshot().Count != 1 || inset != 100 || bridge.IsAvailable) throw new Exception("Consumer smoke failed");
-Console.WriteLine("NuGet consumer: all four libraries loaded successfully.");
+Console.WriteLine("NuGet consumer: all four libraries loaded and clipboard APIs resolved successfully.");
 ''')
     subprocess.run(['dotnet', 'restore', '--configfile', 'NuGet.Config', '--packages', str(consumer / 'packages')], cwd=consumer, check=True)
     assets = json.loads((consumer / 'obj/project.assets.json').read_text())

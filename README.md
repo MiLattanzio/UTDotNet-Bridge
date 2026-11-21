@@ -6,17 +6,17 @@ Native keyboard opening, composition/commit, backspace, password, numeric/email 
 
 ## Install from NuGet
 
-The published preview is **0.1.2-preview.1**, targeting **.NET 10** and tested with **Avalonia 12.1.6**. Run this in your Avalonia application's project directory:
+The published preview is **0.1.5-preview.1**, targeting **.NET 10** and tested with **Avalonia 12.1.6**. Run this in your Avalonia application's project directory:
 
 ```sh
-dotnet add package UTDotNet.Avalonia --version 0.1.2-preview.1
+dotnet add package UTDotNet.Avalonia --version 0.1.5-preview.1
 ```
 
 Or add the reference to the application's `.csproj`:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="UTDotNet.Avalonia" Version="0.1.2-preview.1" />
+  <PackageReference Include="UTDotNet.Avalonia" Version="0.1.5-preview.1" />
 </ItemGroup>
 ```
 
@@ -24,10 +24,10 @@ Or add the reference to the application's `.csproj`:
 
 | Package | Use it for |
 | --- | --- |
-| [UTDotNet.Core](https://www.nuget.org/packages/UTDotNet.Core/0.1.2-preview.1) | Platform detection, phone display scaling and shared input contracts. |
-| [UTDotNet.Diagnostics](https://www.nuget.org/packages/UTDotNet.Diagnostics/0.1.2-preview.1) | Bounded logging, environment reports and optional DBus inspection. |
-| [UTDotNet.UbuntuTouch](https://www.nuget.org/packages/UTDotNet.UbuntuTouch/0.1.2-preview.1) | Managed Maliit sessions and callbacks for a custom UI integration. |
-| [UTDotNet.Avalonia](https://www.nuget.org/packages/UTDotNet.Avalonia/0.1.2-preview.1) | Native keyboard integration for Avalonia `TextBox` controls. |
+| [UTDotNet.Core](https://www.nuget.org/packages/UTDotNet.Core/0.1.5-preview.1) | Platform detection, phone display scaling and shared input contracts. |
+| [UTDotNet.Diagnostics](https://www.nuget.org/packages/UTDotNet.Diagnostics/0.1.5-preview.1) | Bounded logging, environment reports and optional DBus inspection. |
+| [UTDotNet.UbuntuTouch](https://www.nuget.org/packages/UTDotNet.UbuntuTouch/0.1.5-preview.1) | Managed Maliit sessions and callbacks for a custom UI integration. |
+| [UTDotNet.Avalonia](https://www.nuget.org/packages/UTDotNet.Avalonia/0.1.5-preview.1) | Native keyboard integration and opt-in guarded Copy/Cut for Avalonia `TextBox` controls. |
 
 Keep the application's Avalonia backend and theme packages, such as `Avalonia.Desktop` and `Avalonia.Themes.Fluent`, aligned with the tested Avalonia version. The application supplies its display backend, theme, native Linux dependencies and deployment configuration. These NuGet packages contain libraries; the installable Ubuntu Touch demo is a separate [Click package](docs/deployment.md).
 
@@ -49,6 +49,7 @@ public sealed class InputWindow : Window
     private readonly TextInputAdapter _adapter;
     private readonly MaliitInputBridge? _bridge;
     private readonly IDisposable? _registration;
+    private TextClipboardBridge? _clipboard;
 
     public InputWindow()
     {
@@ -73,10 +74,16 @@ public sealed class InputWindow : Window
         {
             _bridge = new MaliitInputBridge(log);
             _registration = _bridge.Register(email, request);
+            Opened += (_, _) =>
+            {
+                if (TryGetPlatformHandle()?.HandleDescriptor == "XID")
+                    _clipboard = new TextClipboardBridge(email, log);
+            };
         }
 
         Closed += (_, _) =>
         {
+            _clipboard?.Dispose();
             _registration?.Dispose();
             _bridge?.Dispose();
             _adapter.Dispose();
@@ -90,6 +97,8 @@ Construct, register and dispose these objects on Avalonia's UI thread. Keep each
 Set the field's `InputRequest.InputType` to `Text`, `Password`, `Email`, `Numeric`, `Phone`, `Url` or `Search`. For passwords, also set the `TextBox.PasswordChar`; for multiline editing, set both `TextBox.AcceptsReturn` and `InputRequest.Multiline`. The application supplies validation. Register field-specific requests; changing an active native registration's input type is not supported in this preview.
 
 The bridge temporarily disables the framework IME on its active registered field and restores it afterwards. Window deactivation requests keyboard dismissal and preserves composition; a later field tap can reopen the keyboard. An application with its own background transition can also `await bridge.DeactivateAsync()` on the UI thread while retaining its registrations.
+
+Since 0.1.5-preview.1, touching a field finalizes pending native composition before selection, and a closing menu returning focus does not dismiss its input context. The example also opts into `TextClipboardBridge` on Ubuntu Touch/X11: keep one instance per field and dispose it with that field. It handles Copy/Cut, bounds the clipboard-manager wait and verifies ownership before deleting an unchanged selection. Paste keeps Avalonia's behavior. `ClipboardTextWriter.TryWriteAsync` provides the same bounded write for application actions such as copying a report. These helpers do not synchronize the clipboard with native Qt apps or guarantee persistence after app exit.
 
 ### Phone layout and startup
 
@@ -146,7 +155,7 @@ dotnet run --project samples/UTDotNet.InputDemo -c Release --no-build -- --smoke
 - `UTDotNet.Core`: conservative, injectable platform detection; input requests, results and an explicit unsupported fallback. Recognizes actual Ubuntu Touch `VARIANT_ID=touch` and system-image metadata. Session and application display backend are kept separate.
 - `UTDotNet.Diagnostics`: bounded event history, optional `ILogger`, safe asynchronous DBus inventory and introspection with timeout, cancellation and output limits.
 - `UTDotNet.UbuntuTouch`: persistent managed Maliit peer, bidirectional callbacks, bounded initialization, cancellation and focus-session ownership. No Qt dependency.
-- `UTDotNet.Avalonia`: observer, opt-in `MaliitInputBridge`, public text-client editing and measured keyboard-inset helper. Commits use Avalonia editing events, preserving selection and undo.
+- `UTDotNet.Avalonia`: observer, opt-in `MaliitInputBridge`, `TextClipboardBridge`, `ClipboardTextWriter`, public text-client editing and measured keyboard-inset helper. Commits and guarded cuts preserve selection/undo behavior.
 - `UTDotNet.InputDemo`: text, password, number, email, multiline, search, phone and URL fields; a native dialog; OSK request buttons; environment, live events and a manual test matrix. Copy report includes matrix results and notes. Results are kept in memory until copied. Phone scaling follows Lomiri grid/8, controls are at least 48 logical units high, and fields scroll above the reported keyboard area.
 - `UTDotNet.Tests`: platform/input tests, mocked DBus command responses, real process failure/timeout/cancellation tests and Avalonia headless editing/lifecycle tests.
 
@@ -166,7 +175,7 @@ See [deployment and confinement](docs/deployment.md), [device record and test ma
 
 Build the installable ARM64 Click with `scripts/build-click.sh`; see the deployment document for prerequisites, installation commands and the bundled review tool's policy-metadata limitation. The tested package uses the standard AppArmor template with no extra policy groups. Rotation, a real kernel suspend/resume cycle, retained composition and input after resume have been verified on this FP5.
 
-Click 0.1.5 passed the user's physical word-selection and Cut/Paste test, including selection of text still in composition. It keeps the original text menus with phone-sized targets. The source adds bounded clipboard writes with exact ownership verification and guards against delayed deletion; these changes are not yet included in the published NuGet 0.1.2-preview.1 packages. Earlier device checks also passed replacement with native keyboard input and copy/paste between fields. See the [test record](docs/device-testing.md#cut-follow-up).
+Click 0.1.5 passed the user's physical word-selection and Cut/Paste test, including selection of text still in composition. It keeps the original text menus with phone-sized targets. NuGet 0.1.5-preview.1 includes the library fixes and opt-in clipboard helpers; menu sizing remains application UI configuration. All 70 automated tests pass. Earlier device checks also passed replacement with native keyboard input and copy/paste between fields. See the [test record](docs/device-testing.md#cut-follow-up).
 
 Clipboard exchange with the native Lomiri UI Toolkit Gallery failed in both directions in 0.1.2 and remains unresolved. Handle dragging extended the selection, but its context menu did not reliably return afterward; recovery after dragging was not rechecked in 0.1.5.
 

@@ -1,6 +1,6 @@
 # NuGet releases
 
-The four libraries ship together as `UTDotNet.Core`, `UTDotNet.Diagnostics`, `UTDotNet.UbuntuTouch` and `UTDotNet.Avalonia`. The Click demo has its own packaging and is not a NuGet package. `Directory.Build.props` defines the library release version; `src/Directory.Build.props` defines shared package metadata. The first release is `0.1.2-preview.1`.
+The four libraries ship together as `UTDotNet.Core`, `UTDotNet.Diagnostics`, `UTDotNet.UbuntuTouch` and `UTDotNet.Avalonia`. The Click demo has its own packaging and is not a NuGet package. `Directory.Build.props` defines the library release version; `src/Directory.Build.props` defines shared package metadata. The current release is `0.1.5-preview.1`; the first release was `0.1.2-preview.1`.
 
 ## Build and verify
 
@@ -38,8 +38,8 @@ The publish job has OIDC permission and uses the `nuget` GitHub environment. It 
 After the policy is active, create and push the release tag at the tested source commit:
 
 ```sh
-git tag nuget-v0.1.2-preview.1
-git push origin nuget-v0.1.2-preview.1
+git tag nuget-v0.1.5-preview.1
+git push origin nuget-v0.1.5-preview.1
 ```
 
 Wait for the workflow and NuGet validation/indexing, then verify that all four versions are publicly downloadable. NuGet versions are immutable. For a partial upload, rerun the failed job; `--skip-duplicate` allows already-published packages to remain in place. For source changes, use a new package version and tag. Do not move a published release tag.

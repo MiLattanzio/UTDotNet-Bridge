@@ -11,7 +11,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>UbuntuTouch;Lomiri;Maliit;Avalonia;Linux;input-method</PackageTags>
-    <PackageReleaseNotes>First experimental NuGet release. Includes native Maliit input, phone layout helpers and keyboard dismissal on window deactivation. Validated on Fairphone 5 with Ubuntu Touch 24.04-2.2 through X11/XWayland; see the package README for limitations.</PackageReleaseNotes>
+    <PackageReleaseNotes>Fixes selection of pending Maliit composition and preserves the input context when focus returns from a menu. Adds opt-in TextClipboardBridge and ClipboardTextWriter for bounded Copy/Cut writes with exact ownership checks and protection against delayed deletion. Validated with 70 tests and physical selection/Cut/Paste on Fairphone 5, Click 0.1.5. Native Qt clipboard interoperability remains unresolved.</PackageReleaseNotes>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Keep existing API summaries; undocumented members do not block preview packaging. -->
     <NoWarn>$(NoWarn);1591</NoWarn>
