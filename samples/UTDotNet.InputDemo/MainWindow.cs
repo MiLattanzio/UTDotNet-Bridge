@@ -21,6 +21,7 @@ namespace UTDotNet.InputDemo;
 public sealed class MainWindow : Window
 {
     private readonly DiagnosticLog _log = new();
+    private readonly ITextClipboard? _nativeClipboard;
     private readonly IPlatformInputService _input = new UnsupportedPlatformInputService();
     private readonly MaliitInputBridge? _maliit;
     private readonly List<IDisposable> _inputRegistrations = [];
@@ -47,6 +48,8 @@ public sealed class MainWindow : Window
 
     public MainWindow(SessionBusDiagnostics? busDiagnostics = null, MaliitInputBridge? inputBridge = null)
     {
+        if (_platform.MobileEnvironment == LinuxMobileEnvironment.UbuntuTouch && !Program.Arguments.Contains("--no-native-clipboard"))
+            _nativeClipboard = new ContentHubClipboard(_log);
         _busDiagnostics = busDiagnostics ?? new SessionBusDiagnostics();
         if (inputBridge is not null ||
             (_platform.MobileEnvironment == LinuxMobileEnvironment.UbuntuTouch && !Program.Arguments.Contains("--no-maliit")))
@@ -172,7 +175,8 @@ public sealed class MainWindow : Window
         if (_platform.MobileEnvironment != LinuxMobileEnvironment.UbuntuTouch) return;
         var menu = new PhoneTextMenu(field);
         _inputRegistrations.Add(menu);
-        var clipboard = new TextClipboardBridge(field, _log);
+        var clipboard = _nativeClipboard is { } native
+            ? new TextClipboardBridge(field, _log, native) : new TextClipboardBridge(field, _log);
         _inputRegistrations.Add(clipboard);
         if (disposeOnDetach) field.DetachedFromVisualTree += (_, _) =>
         { clipboard.Dispose(); menu.Dispose(); _inputRegistrations.Remove(clipboard); _inputRegistrations.Remove(menu); };
@@ -323,7 +327,10 @@ public sealed class MainWindow : Window
         foreach (var entry in _log.Snapshot()) report.AppendLine(entry.ToString());
         if (_platform.MobileEnvironment == LinuxMobileEnvironment.UbuntuTouch)
         {
-            if (!await ClipboardTextWriter.TryWriteAsync(clipboard, report.ToString(), _log, _lifetime.Token)) return;
+            var copied = _nativeClipboard is { } native
+                ? await native.WriteTextAsync(report.ToString(), _lifetime.Token)
+                : await ClipboardTextWriter.TryWriteAsync(clipboard, report.ToString(), _log, _lifetime.Token);
+            if (!copied) return;
         }
         else await clipboard.SetTextAsync(report.ToString());
         _log.Write("Clipboard", "Diagnostic report copied");

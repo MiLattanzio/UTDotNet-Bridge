@@ -1,6 +1,6 @@
 # Validation record
 
-Date: 2026-11-21. No result is inferred from compilation alone.
+Sessions: 2026-11-21 and 2026-11-22. No result is inferred from compilation alone.
 
 ## Environment and scope
 
@@ -13,7 +13,7 @@ Device interaction below used injected touchscreen events through the already-ac
 | Check | Result | Scope |
 |---|---|---|
 | Release build / ARM64 publish | Pass | SDK 10.0.401; untrimmed self-contained directory, about 108 MiB |
-| Automated suite | Pass, 70 tests | Earlier 53 checks plus clipboard editing/undo, password commands, focus return after a menu, bounded writes with exact ownership verification, stale/detached editor protection, sized original-menu actions and preedit finalization before touch selection. Native clipboard interoperability is a separate device result |
+| Automated suite | Pass, 93 tests | Earlier 70 checks plus native MIME/Unicode validation, an isolated session-bus protocol test, rejection/timeouts/cancellation, guarded native Paste, stale-selection/background-return protection, password Paste and field constraints. Native clipboard interoperability is a separate device result |
 | Final desktop X11 smoke | Pass | Window, focus/text diagnostics, fallback OSK results and app render; no native desktop IME claim |
 | Earlier explicit desktop Wayland smoke | Pass | Phase 1 real-window smoke; not repeated for native Maliit |
 | Phone layout | Pass | Headless 360×640 and 900×384 with keyboard, 16-unit font and at least 48-unit fields; physical checks below |
@@ -37,10 +37,11 @@ Test results are retained under ignored `artifacts/test-results/`. The input ser
 | Scrolling and occlusion | Pass in portrait: side-margin swipe scrolls the form and focused lower fields remain reachable above OSK; unchanged geometry is retained on handoff |
 | Native dialog | Pass: native keyboard, `ok` committed in dialog, close returns focus/context to Standard text |
 | Phone UI scale | Pass: grid 24 → absolute scale 3; 1224 physical pixels → 408 logical width, 48-unit controls, readable font, four tabs on one row |
-| Touch selection | Word selection pass, including pending preedit in the user's 0.1.5 test. In 0.1.2 dragging a handle extended the selection correctly, but its menu disappeared and required clearing/reselecting a word to return. Menu recovery after dragging was not rechecked in 0.1.5 |
+| Touch selection | Word selection pass, including pending preedit in the user's 0.1.5 test. The earlier 0.1.2 handle-drag menu problem did not recur in the 0.1.6 check: a drag extended selection 17–21 to 10–21, the original menu returned, and Copy succeeded. Cross-line dragging and other handle directions remain to be tested |
 | Selection replacement / undo | Pass for physical replacement: user selected `mondo` in Multiline and replaced it with `sole` plus a space using the native OSK. Undo/redo remains a headless result, not a phone test |
 | Clipboard within the demo | Copy/Paste pass in 0.1.2: `mondo` transferred from Standard text to Email. Cut initially failed, then passed the user's physical 0.1.5 test: `sole` was removed and pasted back. Logs confirm exact clipboard ownership and text lengths 4 → 0 → 4. Multiline transfer, paste over a selection and undo/redo additionally pass headless tests |
 | Clipboard with native Qt apps (0.1.2) | Fail in this session: the native gallery did not offer Paste after the demo copied `mondo`; after native Copy of `luna`, the demo still pasted stale `mondo`. Native Copy/Paste of `luna` worked, confirmed by the user. Internal demo clipboard success does not establish system interoperability |
+| Native clipboard (0.1.6) | Pass in both directions with the native Qt probe and confined Morph. UTF-8 accents, emoji and two lines reached the demo; Cut wrote accepted native data before removing the selection; a distinct Morph copy replaced earlier clipboard content. User confirmed physical Cut/Paste and comfortable menus. See the detailed record below |
 | Search / phone / URL layouts | Implemented hints; device interaction not yet verified |
 | Accents, alternate languages, long-press variants | Unverified |
 | Physical rotation | Pass: user turned FP5; portrait 408×865 ↔ landscape 900×384, scale 3; text retained. Native landscape keyboard and full focused field visible after layout fix |
@@ -54,7 +55,7 @@ Test results are retained under ignored `artifacts/test-results/`. The input ser
 | Long sessions | Unverified |
 | Native Wayland on FP5 | Blocked before window creation: xdg_wm_base v1 versus required >=3; no text-input manager in observed registry |
 
-The bridge is experimental. Graphics startup still emits gralloc/Zink/GLX warnings; successful basic interaction does not establish acceleration or broad GPU compatibility. The clipboard comparison used the Lomiri UI Toolkit Gallery; no Uno application was tested.
+The bridge is experimental. Graphics startup still emits gralloc/Zink/GLX warnings; successful basic interaction does not establish acceleration or broad GPU compatibility. Clipboard comparisons used Lomiri UI Toolkit Gallery in the earlier session, then a Qt probe and Morph in 0.1.6. No Uno application was tested.
 
 ## Selection and clipboard session — Click 0.1.2
 
@@ -95,6 +96,24 @@ Built and installed artifact: `artifacts/click/utdotnet.inputdemo_0.1.5_arm64.cl
 - Cut waited indefinitely for a clipboard-manager acknowledgement despite already owning the data. The opt-in text clipboard helpers confirm exact in-process ownership after a bounded wait and delete only an unchanged, editable selection in the active editor. Failed ownership checks and late completions cannot delete a different selection.
 - Text held only in the preedit presenter was not selectable by TextBox. Pointer presses now finalize/reset native composition before framework selection handling. The original menu was restored at the user's request, with explicit minimum item dimensions instead of a replacement button layout.
 
+## Native clipboard — Click 0.1.6
+
+On 2026-11-22, `ContentHubClipboard` replaced the demo's X11 clipboard path on Ubuntu Touch. The installed demo ran as PID 6398 with `utdotnet.inputdemo_inputdemo_0.1.6 (enforce)`, unchanged policy groups and scale 3. The native service accepted this confined caller's operations; the earlier explicit Lomiri focus query for baseline PID 5859 also returned true. The new client calls the native service from its own process with an empty surface ID, using the service's caller-PID verification. It does not use an unconfined intermediary for the demo.
+
+The native reference control is `tests/device/NativeClipboardProbe.qml`, run with the device's `qmlscene`, `QT_QPA_PLATFORM=ubuntumirclient` and `QT_IM_MODULE=maliit`. This probe runs unconfined and is a test control, not a shipped native application. The separate Morph check used PID 6697 under `morph-browser (enforce)`. Its test tab was `about:blank`; no search/navigation was submitted.
+
+Observed with injected touch events, compositor captures and redacted logs:
+
+1. Qt's Copy placed `luna caffè 🌙\nseconda riga` on the native clipboard. The demo's original Paste menu inserted all 26 UTF-16 code units into Multiline at 20:46:00 UTC. Both lines, the accent and emoji are visible in `qt-to-demo-multiline.png`; the emoji uses Avalonia's available monochrome glyph.
+2. The demo selected offsets 5–10 (`caffè`). At 20:46:48.729 UTC, Content Hub accepted the write; the source length changed 26 → 21, then `ClipboardCut` confirmed removal. The keyboard remained visible. A newly opened empty Qt probe pasted `caffè`, proving the result was not its earlier local text.
+3. Morph's native Paste inserted `caffè` into the selected separator in the disposable `about:blank` address field, producing `aboutcaffèblank`. Morph then copied that whole 15-character value. Paste into the demo's empty Email field received exactly the new value at 20:50:46.733 UTC, replacing the previous native clipboard value.
+4. The user was asked to physically select, Cut and Paste in the installed 0.1.6, and confirmed: “Sì, funziona ed è comodo”. This is the user's usability result, separate from the injected-touch/log evidence above.
+5. A left-handle drag in Multiline extended the selection from 17–21 (`riga`) to 10–21 (`econda riga`). The original menu reappeared; Copy at 20:52:54.186 UTC was accepted by Content Hub. The earlier menu-recovery problem was not reproduced in this sequence. No new handle/menu implementation was needed.
+
+The build passes 93 tests. Native protocol tests use a private session bus and fake Content Hub to verify actual request signatures, identity arguments, successful/denied operations, timeouts and cancellation. Parser tests include a native-format fixture, Unicode, truncated/invalid buffers and size limits. UI tests cover native Copy/Cut/Paste, replacement/undo, no stale X11 fallback, changed/detached/disposed/read-only editors, background-return races, password command restrictions and MaxLength. Only the headless deactivation regression uses a pinned-framework reflection hook because the headless backend cannot emit that compositor event; production uses public APIs/events.
+
+Installed artifact: `artifacts/click/utdotnet.inputdemo_0.1.6_arm64.click`, SHA-256 `b347c38ae1405dbdf875969fc4e6e5d8d012f60b1f8b4fbbacb5e82f8580dce8`. The review tool still lacks policy 2404.2 metadata and reports the same two policy errors; this is not an OpenStore approval. Native clipboard changes are included in **NuGet 0.1.6-preview.1**; the earlier 0.1.5-preview.1 packages do not contain them.
+
 ## Evidence and remaining work
 
 `artifacts/verification/maliit/` contains baseline/native screenshots, numeric/password/email/multiline/dialog evidence, preserved composition, final layout, redacted device logs and desktop smoke output. These are local ignored artifacts; this document is the versionable record.
@@ -109,4 +128,6 @@ Built and installed artifact: `artifacts/click/utdotnet.inputdemo_0.1.5_arm64.cl
 
 `click-0.1.3-selection.log` records Cut reaching the framework without deletion; `click-0.1.4-selection.log` records uncommitted preedit and unsuccessful selection attempts; `click-0.1.5-selection.log` records the final successful selection/Cut/Paste. Build logs retain the package hashes and unsuccessful review results. `artifacts/test-results/selection/selection.trx` records the final 70 passing automated tests.
 
-Next work: native clipboard integration and rechecking menu recovery after handle dragging; test multiline handle dragging, physical undo/password clipboard commands, accented composition, search/phone/URL modes and longer background sessions. Packaged DBus inventory needs an in-process implementation because launching `gdbus` is denied. Resolve the Click review tool's policy table before claiming a complete store review. Keep the developer path and baseline switch for comparisons.
+`artifacts/verification/native-clipboard/` contains the native Qt, Morph and demo captures, the drag/menu check and `click-0.1.6.log`. `artifacts/native-clipboard-tests.log` records 93 passing tests; `artifacts/native-clipboard-click-build.log` retains packaging and review output.
+
+Next work: broader cross-line/other-direction handle dragging, physical undo/password clipboard commands, accented keyboard composition, search/phone/URL modes and longer background sessions. Native clipboard persistence after process exit/reboot, non-text formats, other devices and large real-device payloads remain unverified. Packaged DBus inventory needs an in-process implementation because launching `gdbus` is denied. Resolve the Click review tool's policy table before claiming a complete store review. Keep the developer path and baseline switches for comparisons.

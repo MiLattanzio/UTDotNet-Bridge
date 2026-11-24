@@ -10,8 +10,8 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>UbuntuTouch;Lomiri;Maliit;Avalonia;Linux;input-method</PackageTags>
-    <PackageReleaseNotes>Fixes selection of pending Maliit composition and preserves the input context when focus returns from a menu. Adds opt-in TextClipboardBridge and ClipboardTextWriter for bounded Copy/Cut writes with exact ownership checks and protection against delayed deletion. Validated with 70 tests and physical selection/Cut/Paste on Fairphone 5, Click 0.1.5. Native Qt clipboard interoperability remains unresolved.</PackageReleaseNotes>
+    <PackageTags>UbuntuTouch;Lomiri;Maliit;Avalonia;Linux;input-method;clipboard</PackageTags>
+    <PackageReleaseNotes>Adds ITextClipboard and managed ContentHubClipboard for native UTF-8 text exchange with Ubuntu Touch apps. The new TextClipboardBridge overload handles Copy/Cut/Paste, preserves undo and field constraints, and rejects late edits after selection or focus changes. Validated with 93 tests and bidirectional Qt/Morph exchange in confined Click 0.1.6 on Fairphone 5. Original phone menus and existing two-argument clipboard integration remain supported. Rich text, images, files and persistence across app exit/reboot are outside the validated scope.</PackageReleaseNotes>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Keep existing API summaries; undocumented members do not block preview packaging. -->
     <NoWarn>$(NoWarn);1591</NoWarn>

@@ -23,7 +23,7 @@ Widget keys and editing semantics were checked against [MInputContext](https://g
 
 ## Limits
 
-Clipboard transport is currently Avalonia's backend implementation; the Maliit bridge does not synchronize it with the native Ubuntu Touch clipboard. In the confined Click 0.1.2 test, copy/paste within the demo passed, but exchange with the native Lomiri UI Toolkit Gallery failed in both directions. Native gallery copy/paste worked as a control. Word selection, handle extension and replacement with native keyboard input worked, although the context menu did not return after a handle drag in the injected-touch test. See the [device record](device-testing.md#selection-and-clipboard-session--click-012) for the exact scope and recovery sequence.
+The Maliit bridge itself does not synchronize Avalonia's clipboard with Ubuntu Touch's native clipboard. NuGet 0.1.6-preview.1 provides a separate, opt-in Content Hub integration, described below and exercised in Click 0.1.6. See the [device record](device-testing.md#native-clipboard--click-016) for current interoperability results and the earlier selection limitations.
 
 ## Bounded clipboard writes (0.1.5-preview.1)
 
@@ -36,6 +36,39 @@ The phone follow-up found that Cut invoked Avalonia's clipboard write but never 
 The demo retains Avalonia's original text menus on Ubuntu Touch. When a menu opens for its current field, its items receive minimum dimensions of 64×48 units and a 16-unit font; the flyout opens transiently. No replacement context flyout is assigned, preserving the framework's selection behavior. This applies to input fields, dialog fields, notes and the report. A separate bridge fix rechecks actual field focus before a deferred hide, so focus returned by a closing menu is not mistaken for a real blur. Window deactivation still explicitly hides the native keyboard.
 
 When a pointer press targets a field with pending native preedit, the Maliit bridge now commits that composition and requests a peer reset before TextBox's pointer handler runs. TextBox selects its committed Text, so leaving the word only in the preedit presenter prevented touch selection. The existing reset generation guard handles stale callbacks; the new headless regression test first reproduced the missing committed text, then passed with pointer finalization.
+
+## Native Content Hub clipboard (0.1.6-preview.1)
+
+These APIs are included in **NuGet 0.1.6-preview.1** and exercised in installed Click 0.1.6. Install `UTDotNet.Avalonia` at that version for the full integration, or `UTDotNet.UbuntuTouch` for the standalone clipboard provider.
+
+`ContentHubClipboard` implements `ITextClipboard` through the session-bus service/interface `com.lomiri.content.dbus.Service`, object `/`. It uses `CreatePaste(ssayas) → b` and `GetLatestPasteData(s) → ay`. The empty surface ID selects the service's normal caller-PID focus check, which Lomiri recognizes for the confined X11 demo. It does not impersonate a Mir surface or request broader AppArmor policy. The managed client needs neither Qt nor an external command.
+
+The [service implementation](https://gitlab.com/ubports/development/core/lomiri-content-hub/-/blob/f9f0adf3e03fb1ba95a1d4473d7727fd57fcce3b/src/com/lomiri/content/detail/service.cpp) and [MIME serialization format](https://gitlab.com/ubports/development/core/lomiri-content-hub/-/blob/f9f0adf3e03fb1ba95a1d4473d7727fd57fcce3b/src/com/lomiri/content/utils.cpp) are the protocol references. The phone runs Content Hub `2.2.3+0~20260916155039.1+ubports24.04.2~1.gbpe8c8d6`; runtime introspection and actual confined calls supplement the source inspection.
+
+On the Avalonia UI thread, opt each Ubuntu Touch field into the native clipboard and keep the registration for its lifetime:
+
+```csharp
+using UTDotNet.Avalonia;
+using UTDotNet.Core;
+using UTDotNet.Diagnostics;
+using UTDotNet.UbuntuTouch;
+
+var log = new DiagnosticLog();
+TextClipboardBridge? editing = null;
+if (new PlatformDetector().Detect().MobileEnvironment == LinuxMobileEnvironment.UbuntuTouch)
+{
+    var nativeClipboard = new ContentHubClipboard(log);
+    editing = new TextClipboardBridge(textBox, log, nativeClipboard);
+    // For an explicit Copy button: await nativeClipboard.WriteTextAsync(text, cancellationToken).
+}
+window.Closed += (_, _) => editing?.Dispose();
+```
+
+`textBox` and `window` above are existing controls. One `ContentHubClipboard` can be shared across fields; it opens and disposes a connection per explicit operation. A two-second deadline covers connection and request, and cancellation/timeout closes that transport. There is no background polling or clipboard-content logging. Writes return true only after Content Hub accepts them. Reads return null for unavailable, invalid or non-text data, with no stale X11 fallback. The codec handles UTF-8 plain text, including accents, emoji and line breaks; it validates the little-endian layout, at most 16 MIME entries and the 4 MiB payload bound. Other text encodings, images, files and rich-text preservation are outside this implementation.
+
+The three-argument `TextClipboardBridge` handles Copy, Cut **and Paste**. Cut and Paste use Avalonia's public editing path, preserving undo and field constraints. Late results cannot edit a changed, detached, disposed or inactive editor; deactivation followed by reactivation also invalidates an outstanding operation. Passwords/sensitive fields cannot Copy/Cut, but can Paste. The two-argument constructor retains the bounded X11 workaround and framework Paste for existing consumers.
+
+The demo enables Content Hub by default on Ubuntu Touch, including dialog fields, notes, report selection and the Copy diagnostic report button. `--no-native-clipboard` selects the earlier backend for comparison. Font, scaling, original menus and touch target sizes remain unchanged. Content Hub stores accepted pastes independently of the X11 owner; persistence across process exit, reboot or service restart has not been tested here.
 
 ## Other limits
 

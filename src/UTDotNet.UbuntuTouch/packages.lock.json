@@ -20,7 +20,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )",
-          "UTDotNet.Core": "[0.1.5-preview.1, )"
+          "UTDotNet.Core": "[0.1.6-preview.1, )"
         }
       },
       "Microsoft.Extensions.Logging.Abstractions": {

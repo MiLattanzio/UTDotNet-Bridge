@@ -80,8 +80,16 @@ using var session = new MaliitSession();
 using var bridge = new MaliitInputBridge(log);
 // Compile the new public API without constructing a view outside an Avalonia UI thread.
 Func<TextBox, DiagnosticLog, TextClipboardBridge> attachClipboard = (field, diagnostics) => new(field, diagnostics);
+ITextClipboard nativeClipboard = new ContentHubClipboard(log);
+Func<TextBox, DiagnosticLog, ITextClipboard, TextClipboardBridge> attachNativeClipboard =
+    (field, diagnostics, clipboard) => new(field, diagnostics, clipboard);
+Func<string, CancellationToken, Task<bool>> writeNativeClipboard = nativeClipboard.WriteTextAsync;
+Func<CancellationToken, Task<string>> readNativeClipboard = nativeClipboard.ReadTextAsync;
 Func<IClipboard, string, DiagnosticLog, CancellationToken, Task<bool>> writeClipboard = ClipboardTextWriter.TryWriteAsync;
 GC.KeepAlive(attachClipboard);
+GC.KeepAlive(attachNativeClipboard);
+GC.KeepAlive(writeNativeClipboard);
+GC.KeepAlive(readNativeClipboard);
 GC.KeepAlive(writeClipboard);
 var inset = MaliitLayout.BottomInset(new InputArea(0, 600, 400, 200), new PixelRect(0, 0, 400, 800), 2);
 if (log.Snapshot().Count != 1 || inset != 100 || bridge.IsAvailable) throw new Exception("Consumer smoke failed");

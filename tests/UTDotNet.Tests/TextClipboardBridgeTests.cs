@@ -78,7 +78,9 @@ public class TextClipboardBridgeTests
         { Assert.Equal("world", text); return write.Task; });
         try
         {
-            field.Focus(); field.SelectionStart = 6; field.SelectionEnd = 11;
+            field.Focus(); Dispatcher.UIThread.RunJobs();
+            Assert.True(window.IsActive);
+            field.SelectionStart = 6; field.SelectionEnd = 11;
             field.Cut();
             Assert.Equal("hello world", field.Text);
             switch (change)
@@ -111,7 +113,9 @@ public class TextClipboardBridgeTests
         using var bridge = new TextClipboardBridge(field, new(), (_, _) => { writes++; return Task.FromResult(true); });
         try
         {
-            field.Focus(); field.SelectAll(); field.Copy(); field.Cut(); Dispatcher.UIThread.RunJobs();
+            field.Focus(); Dispatcher.UIThread.RunJobs();
+            Assert.True(window.IsActive);
+            field.SelectAll(); field.Copy(); field.Cut(); Dispatcher.UIThread.RunJobs();
             Assert.Equal(0, writes);
             Assert.Equal("secret", field.Text);
         }
